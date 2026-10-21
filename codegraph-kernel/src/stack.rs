@@ -183,11 +183,10 @@ pub fn run_guarded<T>(f: impl FnOnce() -> Result<T, String>) -> Result<T, String
 mod tests {
     use super::*;
 
-    /// 2 MiB is half of Node's worker default. Some libc builds have a 2 MiB
-    /// minimum pthread stack (even when 1 MiB is requested); this still
-    /// exercises the guard on a smaller stack than the real worker's.
-    /// Without the guard these walks SIGSEGV instead of failing an assertion.
-    const SMALL_STACK: usize = 2 << 20;
+    /// 1 MiB is a quarter of Node's worker default; a guard that holds here
+    /// holds on every real thread. Without the guard these walks SIGSEGV the
+    /// test process instead of failing an assertion.
+    const SMALL_STACK: usize = 1 << 20;
     const DEPTH: usize = 30_000;
 
     fn on_small_stack<T: Send + 'static>(f: impl FnOnce() -> T + Send + 'static) -> T {
@@ -218,8 +217,9 @@ mod tests {
         on_small_stack(|| {
             let low = os_stack_low().expect("OS stack bounds available");
             let used = current_sp() - low;
-            // std/the OS may round the requested size up slightly; the
-            // bounds must describe THIS thread, not the main thread.
+            // std/the OS round the requested size up a little (macOS reports
+            // 1,060,864 for a 1 MiB request); the point is that the bounds
+            // describe THIS thread's small stack, not the main thread's.
             assert!(
                 used <= SMALL_STACK + 128 * 1024,
                 "used {used} is not within the {SMALL_STACK}-byte stack"
