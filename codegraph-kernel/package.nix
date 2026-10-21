@@ -22,6 +22,13 @@ rustPlatform.buildRustPackage (finalAttrs: {
 
   cargoLock.lockFile = ./Cargo.lock;
 
+  # Nix's glibc can give a thread requesting 1 MiB a 2 MiB stack. This
+  # assertion tests the requested size, not the extraction guard; keep
+  # the other stack-guard tests and the entire suite on Darwin.
+  checkFlags = lib.optionals stdenv.hostPlatform.isLinux [
+    "--skip=stack::tests::small_stack_reports_its_own_bounds"
+  ];
+
   installPhase = ''
     runHook preInstall
     install -Dm755 target/${stdenv.hostPlatform.rust.rustcTargetSpec}/release/libcodegraph_kernel.${
